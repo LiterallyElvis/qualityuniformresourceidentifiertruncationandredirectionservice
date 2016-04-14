@@ -9,6 +9,26 @@ import (
 
 var db *bolt.DB
 var primaryBucketName []byte
+var markov *Chain
+
+func init() {
+	markov = buildMarkov()
+	primaryBucketName = []byte("Links")
+	var err error
+	// Open the my.db data file in your current directory.
+	// It will be created if it doesn't exist.
+	db, err = bolt.Open("quritars.db", 0600, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// ensure our default bucket exists
+	err = createBucket(primaryBucketName)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func createBucket(name []byte) error {
 	// Start a writable transaction.
@@ -69,34 +89,23 @@ func apiGetValue(w http.ResponseWriter, r *http.Request) {
 	w.Write(rv)
 }
 
+func testMarkov(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(generateMarkovString(markov)))
+}
+
 func notFoundError(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Sorry, 404! :("))
 }
 
 func main() {
-	primaryBucketName = []byte("Links")
-	var err error
-	// Open the my.db data file in your current directory.
-	// It will be created if it doesn't exist.
-	db, err = bolt.Open("qualityuniformresourceidentifiertruncationandredirectionservice.db", 0600, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	// ensure our default bucket exists
-	err = createBucket(primaryBucketName)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	router := mux.NewRouter()
-	router.Methods("GET", "POST")
+	// router.Methods("GET", "POST")
 
 	router.HandleFunc("/api/add/{key}/{value}", apiAddValue)
 	router.HandleFunc("/api/get/{key}", apiGetValue)
-	// router.NotFoundHandler = http.HandlerFunc(notFoundError)
+	router.HandleFunc("/api/farts", testMarkov)
+	router.NotFoundHandler = http.HandlerFunc(notFoundError)
 
-	http.Handle("/api", router)
-	http.ListenAndServe(":3000", nil)
+	http.Handle("/", router)
+	http.ListenAndServe(":8080", nil)
 }
