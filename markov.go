@@ -53,6 +53,7 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -133,10 +134,13 @@ func buildMarkov() *Chain {
 }
 
 func cleanString(s string) string {
-	return strings.Replace(strings.Replace(s, ".", "", -1), " ", "", -1)
+	punc := regexp.MustCompile("[.,;!?\\-~\"'&]")
+	space := regexp.MustCompile(" ")
+
+	return space.ReplaceAllString(punc.ReplaceAllString(s, ""), "")
 }
 
-func generateMarkovString(c *Chain) string {
+func generateMarkovString(c *Chain) []byte {
 	randomIndex := rand.Intn(len(c.chain))
 	currentIndex := 0
 	var selectedStart string
@@ -149,7 +153,7 @@ func generateMarkovString(c *Chain) string {
 		}
 	}
 
-	text := c.Generate(rand.Intn(20)+15, selectedStart) // Generate text.
-	s := cleanString(string([]byte(text)[35:]))
-	return url.QueryEscape(s)
+	text := c.Generate(rand.Intn(25)+25, selectedStart) // Generate text.
+	s := cleanString(string([]byte(text)[37:]))
+	return []byte(url.QueryEscape(s))
 }
