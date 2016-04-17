@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
@@ -16,6 +17,18 @@ var markov *Chain
 func init() {
 	markov = buildMarkov()
 	primaryBucketName = []byte("Links")
+}
+
+type shortenerResponse struct {
+	Key, Destination, Error string `json:",omitempty"`
+}
+
+func returnJSONFromStruct(s shortenerResponse) []byte {
+	o, err := json.Marshal(s)
+	if err != nil {
+		log.Printf("error occurred marshalling notFoundError response: %v\n", err)
+	}
+	return o
 }
 
 func createBucket(name []byte) error {
@@ -94,24 +107,69 @@ func apiAddValue(w http.ResponseWriter, r *http.Request) {
 func apiGetValue(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	k := []byte(vars["key"])
-	rv := readKeyFromBucket(primaryBucketName, k)
-	w.Write(rv)
+	if len(k) != 0 {
+		rv := readKeyFromBucket(primaryBucketName, k)
+		w.Write(rv)
+	}
 }
 
 func homepage(w http.ResponseWriter, r *http.Request) {
 	indexPage, err := ioutil.ReadFile("index.html")
 	if err != nil {
-		log.Printf("error occurred reading indexPage: %v", err)
+		log.Printf("error occurred reading indexPage: %v\n", err)
 	}
 	w.Write(indexPage)
 }
 
 func notFoundError(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Sorry, 404! :("))
+	response := shortenerResponse{
+		Error: "Sorry, 404! :(",
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Write(returnJSONFromStruct(response))
 }
 
 func testMarkovChain(w http.ResponseWriter, r *http.Request) {
-	w.Write(generateMarkovString(markov))
+	url := r.URL.Query().Get("url")
+
+	if len(url) == 0 {
+		t := shortenerResponse{
+			Error: "Invalid URL Provided!",
+		}
+		w.Write(returnJSONFromStruct(t))
+		return
+	}
+
+	var result shortenerResponse
+	var v []byte
+	m := []byte(" ")
+
+	// note, I thought I'd be a clever boy and change the above to
+	// var v, m []byte, and change the below check to for len(m) == 0
+	// but everything died when I did that and I've been up too long
+	// to figure out why. A mystery for another day, it would seem.
+
+	for len(m) != 0 {
+		v = generateMarkovString(markov)
+		m = readKeyFromBucket(primaryBucketName, v)
+	}
+
+	// TODO: Reevaluate where we're using Strings versus byte arrays and why
+	result.Key = string(v)
+	o, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("error encountered marshalling json: %v\n", err)
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Write(o)
+	// addKeyValueToBucket(primaryBucketName, v, k)
+}
+
+func deadFunc(w http.ResponseWriter, r *http.Request) {
+	// this is a literal crime against programming
+	// Rob Pike never wanted something like this to be written
+
+	// nobody ever wanted something like this to be written
 }
 
 func main() {
@@ -131,12 +189,13 @@ func main() {
 	}
 
 	router := mux.NewRouter()
-	// router.Methods("GET", "POST")
-
 	router.HandleFunc("/", homepage)
+	router.HandleFunc("/favicon.ico", deadFunc)
+	// I know I need to actually serve the above files, but
+	// I don't feel like it at the moment, sue me if you must.
+
+	router.HandleFunc("/api/add", testMarkovChain)
 	router.HandleFunc("/{key}", apiGetValue)
-	router.HandleFunc("/api/test", testMarkovChain)
-	router.HandleFunc("/api/add/{key}", apiAddValue)
 	router.NotFoundHandler = http.HandlerFunc(notFoundError)
 
 	http.Handle("/", router)

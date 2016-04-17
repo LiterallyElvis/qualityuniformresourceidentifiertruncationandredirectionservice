@@ -9,7 +9,7 @@
     <h3 id="pageTitle">Quality Uniform Resource Identifier Truncation And Redirection Service</h3>
 
     <div class="form-group has-danger" id="inputContainer">
-      <label class="form-control-label" for="inputDanger">Enter a URL:</label>
+      <label class="form-control-label" for="inputDanger">Enter a valid URL:</label>
       <input type="text" id="urlInput" class="inputs form-control">
       <button class="btn btn-default hidden" id="getUrlButton">Get URL!</button>
     </div>
@@ -59,6 +59,36 @@
           inputContainer.classList.add("has-danger");
           outputField.classList.add("hidden");
           getUrlButton.classList.add("hidden");
+        }
+      });
+
+      getUrlButton.addEventListener('click', function(e){
+        var urlIsValid = urlValidation.test(inputField.value.trim())
+
+        if( urlIsValid ){
+          var request = new XMLHttpRequest();
+          request.open('GET', '//localhost:8080/api/add?url=' + encodeURIComponent(inputField.value.trim()), true);
+
+          request.onload = function() {
+            if (request.status >= 200 && request.status < 400) {
+              // Success!
+              // var data = JSON.parse(request.responseText);
+              console.log('data returned: \n\t', request.responseText)
+              outputField.value = request.responseText;
+            } else {
+              // We reached our target server, but it returned an error
+              console.log('error encountered! \n\t' + request.responseText);
+              outputField.value = request.responseText;
+            }
+          };
+
+          request.onerror = function() {
+            // There was a connection error of some sort
+            console.log('Oh no! \n\t' + request.responseText);
+              outputField.value = request.responseText;
+          };
+
+          request.send();
         }
       });
     </script>
