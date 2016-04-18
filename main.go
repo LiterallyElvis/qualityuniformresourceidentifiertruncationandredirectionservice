@@ -188,5 +188,5 @@ func main() {
 	router.NotFoundHandler = http.HandlerFunc(notFoundError)
 
 	http.Handle("/", router)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":80", nil)
 }

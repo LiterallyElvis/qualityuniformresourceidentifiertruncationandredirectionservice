@@ -24,5 +24,7 @@ _testmain.go
 *.prof
 
 qualityuniformresourceidentifiertruncationandredirectionservice
+website
 *.db
 *.db.lock
+run.sh
