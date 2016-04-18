@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/boltdb/bolt"
 	"github.com/gorilla/mux"
 	"io/ioutil"
@@ -20,7 +19,9 @@ func init() {
 }
 
 type shortenerResponse struct {
-	Key, Destination, Error string `json:",omitempty"`
+	Key         string `json:",omitempty"`
+	Destination string `json:",omitempty"`
+	Error       string `json:",omitempty"`
 }
 
 func returnJSONFromStruct(s shortenerResponse) []byte {
@@ -73,8 +74,8 @@ func addKeyValueToBucket(bucketName []byte, key []byte, value []byte) {
 	})
 }
 
-// Keys prints a list of all keys.
-func Keys() {
+// prints a list of all keys.
+func keys() {
 	db.View(func(tx *bolt.Tx) error {
 		// Assume bucket exists and has keys
 		b := tx.Bucket(primaryBucketName)
@@ -89,9 +90,17 @@ func Keys() {
 }
 
 func apiAddValue(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	k := []byte(vars["key"])
+	url := []byte(r.URL.Query().Get("url"))
 
+	if len(url) == 0 {
+		t := shortenerResponse{
+			Error: "Invalid URL Provided!",
+		}
+		w.Write(returnJSONFromStruct(t))
+		return
+	}
+
+	var result shortenerResponse
 	var v []byte
 	m := []byte(" ")
 
@@ -100,8 +109,16 @@ func apiAddValue(w http.ResponseWriter, r *http.Request) {
 		m = readKeyFromBucket(primaryBucketName, v)
 	}
 
-	addKeyValueToBucket(primaryBucketName, v, k)
-	w.Write([]byte(fmt.Sprintf("your new link is: localhost:8080/%v", string(v))))
+	result.Key = string(v)
+	o, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("error encountered marshalling json: %v\n", err)
+	}
+
+	addKeyValueToBucket(primaryBucketName, v, url)
+
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Write(o)
 }
 
 func apiGetValue(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +126,9 @@ func apiGetValue(w http.ResponseWriter, r *http.Request) {
 	k := []byte(vars["key"])
 	if len(k) != 0 {
 		rv := readKeyFromBucket(primaryBucketName, k)
-		w.Write(rv)
+		http.Redirect(w, r, string(rv), 301)
+	} else {
+		notFoundError(w, r)
 	}
 }
 
@@ -129,54 +148,11 @@ func notFoundError(w http.ResponseWriter, r *http.Request) {
 	w.Write(returnJSONFromStruct(response))
 }
 
-func testMarkovChain(w http.ResponseWriter, r *http.Request) {
-	url := r.URL.Query().Get("url")
-
-	if len(url) == 0 {
-		t := shortenerResponse{
-			Error: "Invalid URL Provided!",
-		}
-		w.Write(returnJSONFromStruct(t))
-		return
-	}
-
-	var result shortenerResponse
-	var v []byte
-	m := []byte(" ")
-
-	// note, I thought I'd be a clever boy and change the above to
-	// var v, m []byte, and change the below check to for len(m) == 0
-	// but everything died when I did that and I've been up too long
-	// to figure out why. A mystery for another day, it would seem.
-
-	for len(m) != 0 {
-		v = generateMarkovString(markov)
-		m = readKeyFromBucket(primaryBucketName, v)
-	}
-
-	// TODO: Reevaluate where we're using Strings versus byte arrays and why
-	result.Key = string(v)
-	o, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("error encountered marshalling json: %v\n", err)
-	}
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Write(o)
-	// addKeyValueToBucket(primaryBucketName, v, k)
-}
-
-func deadFunc(w http.ResponseWriter, r *http.Request) {
-	// this is a literal crime against programming
-	// Rob Pike never wanted something like this to be written
-
-	// nobody ever wanted something like this to be written
-}
-
 func main() {
 	var err error
-	// Open the my.db data file in your current directory.
+	// Open the db data file in your current directory.
 	// It will be created if it doesn't exist.
-	db, err = bolt.Open("quritars.db", 0600, nil)
+	db, err = bolt.Open("whatever.db", 0600, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -190,11 +166,11 @@ func main() {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/", homepage)
-	router.HandleFunc("/favicon.ico", deadFunc)
+	router.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 	// I know I need to actually serve the above files, but
 	// I don't feel like it at the moment, sue me if you must.
 
-	router.HandleFunc("/api/add", testMarkovChain)
+	router.HandleFunc("/api/add", apiAddValue)
 	router.HandleFunc("/{key}", apiGetValue)
 	router.NotFoundHandler = http.HandlerFunc(notFoundError)
 

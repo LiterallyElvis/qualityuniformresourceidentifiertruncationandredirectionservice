@@ -136,8 +136,7 @@ func buildMarkov() *Chain {
 func cleanString(s string) string {
 	punc := regexp.MustCompile("[.,;!?\\-~\"'&]")
 	space := regexp.MustCompile(" ")
-
-	return space.ReplaceAllString(punc.ReplaceAllString(s, ""), "")
+	return strings.ToLower(space.ReplaceAllString(punc.ReplaceAllString(s, ""), ""))
 }
 
 func generateMarkovString(c *Chain) []byte {
@@ -154,6 +153,6 @@ func generateMarkovString(c *Chain) []byte {
 	}
 
 	text := c.Generate(rand.Intn(25)+25, selectedStart) // Generate text.
-	s := cleanString(string([]byte(text)[37:]))
+	s := cleanString(string([]byte(text)[39:]))
 	return []byte(url.QueryEscape(s))
 }
