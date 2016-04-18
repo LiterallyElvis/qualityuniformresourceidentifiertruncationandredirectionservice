@@ -26,6 +26,13 @@
       var outputField = document.getElementById("urlOutput");
       var getUrlButton = document.getElementById("getUrlButton");
 
+      function markInputAsErroneous(){
+          inputContainer.classList.remove("has-success");
+          inputContainer.classList.add("has-danger");
+          outputField.classList.add("hidden");
+          getUrlButton.classList.add("hidden");
+      }
+
       inputField.addEventListener("keyup", function(e){
         if( urlValidation.test(inputField.value.trim()) ){
           inputContainer.classList.add("has-success");
@@ -33,10 +40,7 @@
           outputField.classList.remove("hidden");
           getUrlButton.classList.remove("hidden");
         } else {
-          inputContainer.classList.remove("has-success");
-          inputContainer.classList.add("has-danger");
-          outputField.classList.add("hidden");
-          getUrlButton.classList.add("hidden");
+          markInputAsErroneous();
         }
       });
 
@@ -45,13 +49,18 @@
           var request = new XMLHttpRequest();
           request.open('GET', '//localhost:8080/api/add?url=' + encodeURIComponent(inputField.value.trim()), true);
           request.onload = function() {
-            if (request.status >= 200 && request.status < 400) {
+            if( request.status == 200 ){
               // Success!
               var data = JSON.parse(request.responseText);
-              outputField.value = window.location.href + data.Key;
-              outputField.focus();
-              outputField.select();
-              document.execCommand("copy");
+              if( data.Error ){
+                outputField.value = data.Error;
+                markInputAsErroneous();
+              } else {
+                outputField.value = window.location.href + data.Key;
+                outputField.focus();
+                outputField.select();
+              }
+
             } else {
               // We reached our target server, but it returned an error
               console.log('error encountered! \n\t' + request.responseText);

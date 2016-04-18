@@ -7,15 +7,19 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
 
 var db *bolt.DB
 var primaryBucketName []byte
 var markov *Chain
+var domain string
 
 func init() {
 	markov = buildMarkov()
 	primaryBucketName = []byte("Links")
+	domain = os.Getenv("DOMAIN")
 }
 
 type shortenerResponse struct {
@@ -74,7 +78,7 @@ func addKeyValueToBucket(bucketName []byte, key []byte, value []byte) {
 	})
 }
 
-// prints a list of all keys.
+// prints a list of all keys. Not used in any routes, but handy to keep around, should the need arise.
 func keys() {
 	db.View(func(tx *bolt.Tx) error {
 		// Assume bucket exists and has keys
@@ -90,13 +94,17 @@ func keys() {
 }
 
 func apiAddValue(w http.ResponseWriter, r *http.Request) {
-	url := []byte(r.URL.Query().Get("url"))
+	url := r.URL.Query().Get("url")
+
+	if strings.Contains(url, domain) {
+		// If the url provided contains the domain name we're running, we respond with an error
+		respondWithError(w, r, "Invalid URL Provided! You musn't shorten links to the service itself!")
+		return
+	}
 
 	if len(url) == 0 {
-		t := shortenerResponse{
-			Error: "Invalid URL Provided!",
-		}
-		w.Write(returnJSONFromStruct(t))
+		// If no url query param is provided, we respond with an error
+		respondWithError(w, r, "Empty URL Provided!")
 		return
 	}
 
@@ -115,9 +123,7 @@ func apiAddValue(w http.ResponseWriter, r *http.Request) {
 		log.Printf("error encountered marshalling json: %v\n", err)
 	}
 
-	addKeyValueToBucket(primaryBucketName, v, url)
-
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	addKeyValueToBucket(primaryBucketName, v, []byte(url))
 	w.Write(o)
 }
 
@@ -130,6 +136,13 @@ func apiGetValue(w http.ResponseWriter, r *http.Request) {
 	} else {
 		notFoundError(w, r)
 	}
+}
+
+func respondWithError(w http.ResponseWriter, r *http.Request, e string) {
+	w.Write(returnJSONFromStruct(
+		shortenerResponse{
+			Error: e,
+		}))
 }
 
 func homepage(w http.ResponseWriter, r *http.Request) {
