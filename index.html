@@ -45,9 +45,9 @@
       });
 
       function getNewLink(e){
-        if( urlValidation.test(inputField.value.trim()); ){
+        if( urlValidation.test(inputField.value.trim()) ){
           var request = new XMLHttpRequest();
-          request.open('GET', '//localhost:8080/api/add?url=' + encodeURIComponent(inputField.value.trim()), true);
+          request.open('GET', '/api/add?url=' + encodeURIComponent(inputField.value.trim()), true);
           request.onload = function() {
             if( request.status == 200 ){
               // Success!
