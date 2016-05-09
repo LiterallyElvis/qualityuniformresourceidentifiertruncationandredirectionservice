@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -129,9 +130,9 @@ func apiAddValue(w http.ResponseWriter, r *http.Request) {
 
 func apiGetValue(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	k := []byte(vars["key"])
+	k := url.QueryEscape(vars["key"])
 	if len(k) != 0 {
-		rv := readKeyFromBucket(primaryBucketName, k)
+		rv := readKeyFromBucket(primaryBucketName, []byte(k))
 		http.Redirect(w, r, string(rv), 301)
 	} else {
 		notFoundError(w, r)
